@@ -1,0 +1,424 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Digit Analyzer Pro</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="deriv_digit_analyzer_v3.css">
+</head>
+<body>
+  <div id="lockscreen" class="lockscreen" aria-hidden="false">
+    <div class="lock-card">
+      <div class="lock-badge">Secure console</div>
+      <h1>Digit Analyzer Pro</h1>
+      <p>Enter the access code to unlock the dashboard.</p>
+      <div class="lock-field">
+        <label for="lockPass">Access code</label>
+        <div class="lock-row">
+          <input id="lockPass" type="password" inputmode="numeric" autocomplete="off" placeholder="Enter code">
+          <button id="unlockBtn" class="btn btn-primary" type="button">Unlock</button>
+        </div>
+        <div id="lockError" class="lock-error" aria-live="polite"></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="riskAlert" class="alert-modal hidden" role="dialog" aria-modal="true" aria-live="polite">
+    <div class="alert-card">
+      <div class="alert-badge" id="alertBadge">Risk alert</div>
+      <h2 id="alertTitle">Risk limit reached</h2>
+      <p id="alertMessage">Your bot has stopped due to a risk limit.</p>
+      <div class="alert-actions">
+        <button id="alertCloseBtn" class="btn btn-primary" type="button">Got it</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="appRoot" class="app app-shell" aria-hidden="true">
+    <div class="header">
+      <div class="header-left">
+        <div class="app-logo">
+          <svg viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect x="1" y="9" width="3" height="8" rx="1.5" fill="#71e48a"/>
+            <rect x="5.5" y="5" width="3" height="12" rx="1.5" fill="#8bff5c"/>
+            <rect x="10" y="2" width="3" height="15" rx="1.5" fill="#71e48a"/>
+            <rect x="14.5" y="6" width="3" height="11" rx="1.5" fill="#c4ffd8"/>
+          </svg>
+        </div>
+        <div>
+          <div class="app-title">Digit Analyzer Pro</div>
+          <div class="app-sub">Deriv volatility index tracker</div>
+        </div>
+      </div>
+      <div class="header-right">
+        <div class="balance-pill" aria-live="polite">
+          <span class="balance-label">Balance</span>
+          <span class="balance-value" id="balanceValue">--</span>
+          <span class="balance-currency" id="balanceCurrency">USD</span>
+        </div>
+        <span class="sdot dOff" id="connDot"></span>
+        <span class="badge bX" id="connBadge">offline</span>
+        <label class="sr-only" for="symSel">Symbol</label>
+        <select id="symSel" onchange="document.getElementById('symBadge').textContent=this.value" style="font-size:12px;padding:5px 8px">
+          <option>R_10</option><option>R_25</option><option>R_50</option><option selected>R_75</option><option>R_100</option>
+          <option>1HZ10V</option><option>1HZ25V</option><option>1HZ50V</option><option>1HZ75V</option><option>1HZ100V</option>
+        </select>
+        <span class="badge bP" id="symBadge">R_75</span>
+      </div>
+    </div>
+
+    <div class="api-bar">
+      <div class="api-row">
+        <label class="api-label" for="apiKeyInput">Deriv API key</label>
+        <div class="api-input-wrap">
+          <input class="api-input" type="password" id="apiKeyInput" placeholder="Paste your API token here..." autocomplete="off">
+          <button class="api-eye" id="apiEye" type="button" onclick="toggleApiVis()" aria-pressed="false">Show</button>
+        </div>
+        <button class="btn btn-primary" type="button" onclick="connectWithKey()">Connect</button>
+        <div class="account-pill" aria-live="polite">
+          <span class="account-label">Account</span>
+          <div class="account-row">
+            <span class="badge bX" id="accountBadge">unknown</span>
+            <span class="account-id" id="accountId">--</span>
+          </div>
+        </div>
+        <div class="api-status">
+          <span class="sdot dOff" id="apiDot"></span>
+          <span id="apiStatusLbl" style="font-size:11px;color:var(--muted)">Not connected</span>
+        </div>
+      </div>
+      <div class="api-hint">Get your API token from <a href="https://app.deriv.com/account/api-token" target="_blank" rel="noopener">app.deriv.com/account/api-token</a> - read-only token is sufficient for digit data.</div>
+    </div>
+
+    <div class="tab-bar" role="tablist" aria-label="Primary">
+      <button class="tab active" type="button" id="tabBtn-live" data-tab="live" role="tab" aria-controls="tab-live" aria-selected="true" onclick="switchTab('live')">Live feed</button>
+      <button class="tab" type="button" id="tabBtn-ou" data-tab="ou" role="tab" aria-controls="tab-ou" aria-selected="false" onclick="switchTab('ou')">Over / Under</button>
+      <button class="tab" type="button" id="tabBtn-freq" data-tab="freq" role="tab" aria-controls="tab-freq" aria-selected="false" onclick="switchTab('freq')">Frequency</button>
+      <button class="tab" type="button" id="tabBtn-trade" data-tab="trade" role="tab" aria-controls="tab-trade" aria-selected="false" onclick="switchTab('trade')">Trade bot</button>
+      <button class="tab" type="button" id="tabBtn-signals" data-tab="signals" role="tab" aria-controls="tab-signals" aria-selected="false" onclick="switchTab('signals')">Signals</button>
+      <button class="tab" type="button" id="tabBtn-rich" data-tab="rich" role="tab" aria-controls="tab-rich" aria-selected="false" onclick="switchTab('rich')">RICH AI</button>
+      <button class="tab" type="button" id="tabBtn-history" data-tab="history" role="tab" aria-controls="tab-history" aria-selected="false" onclick="switchTab('history')">History</button>
+    </div>
+
+    <div id="tab-live" class="section active" role="tabpanel" aria-labelledby="tabBtn-live">
+      <div class="panel">
+        <div class="panel-title">
+          <span>Last 50 digits</span>
+          <div class="legend">
+            <span style="display:flex;align-items:center;gap:4px"><span class="sd s-over"></span> over</span>
+            <span style="display:flex;align-items:center;gap:4px"><span class="sd s-under"></span> under</span>
+            <span style="display:flex;align-items:center;gap:4px"><span class="sd s-mid"></span> mid</span>
+          </div>
+        </div>
+        <div class="tape" id="tape"><span class="muted">Connect to receive live digits...</span></div>
+      </div>
+      <div class="g4">
+        <div class="metric"><div class="mv" id="mTotal">0</div><div class="ml">Total ticks</div></div>
+        <div class="metric"><div class="mv" id="mLast">--</div><div class="ml">Last digit</div></div>
+        <div class="metric"><div class="mv" id="mStreak">--</div><div class="ml">Current streak</div></div>
+        <div class="metric"><div class="mv" id="mRate" style="color:#71e48a">--</div><div class="ml">Over <span id="mRateThr">4</span> rate</div></div>
+      </div>
+      <div class="g3" style="margin-bottom:12px">
+        <div class="metric"><div class="mv" id="mEven">0%</div><div class="ml">Even %</div></div>
+        <div class="metric"><div class="mv" id="mOdd">0%</div><div class="ml">Odd %</div></div>
+        <div class="metric"><div class="mv" id="mRepeat">0</div><div class="ml">Same-digit repeats</div></div>
+      </div>
+      <div class="panel">
+        <div class="panel-title">Flow (last 40)</div>
+        <div class="sdots" id="flowDots"></div>
+      </div>
+    </div>
+
+    <div id="tab-ou" class="section" role="tabpanel" aria-labelledby="tabBtn-ou">
+      <div class="panel">
+        <div class="panel-title">Over threshold - click to select</div>
+        <div class="muted" style="margin-bottom:8px">Digit must be strictly greater than the threshold. Rates from last 200 ticks.</div>
+        <div class="ou-grid" id="overRow1"></div>
+        <div class="ou-grid" id="overRow2"></div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:6px">
+          <span class="muted">Active:</span>
+          <span class="badge bG" id="activeOverBadge">Over 4</span>
+          <span class="badge bG" id="overHitBadge">--%</span>
+          <span class="muted" id="overHitCount"></span>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-title">Under threshold - click to select</div>
+        <div class="muted" style="margin-bottom:8px">Digit must be strictly less than the threshold. Rates from last 200 ticks.</div>
+        <div class="ou-grid" id="underRow1"></div>
+        <div class="ou-grid" id="underRow2"></div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:6px">
+          <span class="muted">Active:</span>
+          <span class="badge bB" id="activeUnderBadge">Under 5</span>
+          <span class="badge bB" id="underHitBadge">--%</span>
+          <span class="muted" id="underHitCount"></span>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-title">Split view - Over <span id="splitOLbl">4</span> vs Under <span id="splitULbl">5</span></div>
+        <div class="split-wrap">
+          <div class="sb-over" id="sbO" style="width:50%">50%</div>
+          <div class="sb-under" id="sbU" style="width:50%">50%</div>
+        </div>
+        <div class="g4">
+          <div class="metric"><div class="mv" id="soHits">0</div><div class="ml">Over hits</div></div>
+          <div class="metric"><div class="mv" id="suHits">0</div><div class="ml">Under hits</div></div>
+          <div class="metric"><div class="mv" id="soStreak">0</div><div class="ml">Over streak</div></div>
+          <div class="metric"><div class="mv" id="suStreak">0</div><div class="ml">Under streak</div></div>
+        </div>
+        <div style="margin-top:10px">
+          <div class="muted" style="margin-bottom:5px">Over/Under flow (last 40)</div>
+          <div class="sdots" id="ouDots"></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="tab-freq" class="section" role="tabpanel" aria-labelledby="tabBtn-freq">
+      <div class="panel">
+        <div class="panel-title">Digit frequency - all ticks</div>
+        <div id="freqChart"></div>
+      </div>
+      <div class="panel">
+        <div class="panel-title">Heat map</div>
+        <div class="heat-grid" id="heatGrid"></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
+          <span class="muted">Hottest:</span><span class="badge bR" id="hotD">--</span>
+          <span class="muted">Coldest:</span><span class="badge bB" id="coldD">--</span>
+          <span class="muted">Max repeat:</span><span class="badge bA" id="maxRepD">--</span>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-title">
+          <span>Rolling window</span>
+          <span class="muted" id="winLbl2">100 ticks</span>
+        </div>
+        <input type="range" id="winRange" min="20" max="200" step="10" value="100" style="width:100%;margin-bottom:10px" oninput="document.getElementById('winLbl2').textContent=this.value+' ticks';renderWindow()">
+        <div id="winStats"></div>
+      </div>
+    </div>
+
+    <div id="tab-trade" class="section" role="tabpanel" aria-labelledby="tabBtn-trade">
+      <div class="panel">
+        <div class="panel-title">
+          <span>Bot status</span>
+          <span class="badge bX" id="botBadge">stopped</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px">
+          <span class="sdot dOff" id="botDot"></span>
+          <span style="font-size:13px;color:var(--muted)" id="botLbl">Bot inactive - connect first</span>
+        </div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <button class="btn btnG" type="button" onclick="botStart()">Start</button>
+          <button class="btn btnA" type="button" onclick="botPause()">Pause</button>
+          <button class="btn btnR" type="button" onclick="botStop()">Stop</button>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-title">Contract settings</div>
+        <div class="ctrl-row"><span class="ctrl-lbl">Contract type</span>
+          <select id="ctType" onchange="updatePredOpts()">
+            <option>Over/Under</option><option>Even/Odd</option><option>Matches/Differs</option>
+          </select>
+        </div>
+        <div class="ctrl-row"><span class="ctrl-lbl">Prediction</span>
+          <select id="ctPred" style="min-width:140px"></select>
+        </div>
+        <div class="ctrl-row"><span class="ctrl-lbl">Stake ($)</span>
+          <input type="number" id="stakeVal" value="1.00" min="0.35" step="0.01" style="width:80px">
+        </div>
+        <div class="ctrl-row"><span class="ctrl-lbl">Duration (ticks)</span>
+          <input type="number" id="durTicks" value="1" min="1" max="10" style="width:60px">
+        </div>
+        <div class="ctrl-row"><span class="ctrl-lbl">Martingale x</span>
+          <input type="number" id="martX" value="2.0" min="1" max="5" step="0.1" style="width:60px">
+          <label class="toggle"><input type="checkbox" id="martOn" onchange="document.getElementById('martLbl').textContent=this.checked?'On':'Off'"><span class="sl-t"></span></label>
+          <span style="font-size:11px;color:var(--muted)" id="martLbl">Off</span>
+        </div>
+        <div class="ctrl-row"><span class="ctrl-lbl">Take profit ($)</span>
+          <input type="number" id="tpVal" value="5.00" step="0.01" style="width:70px">
+          <label class="toggle"><input type="checkbox" id="tpOn" checked><span class="sl-t"></span></label>
+        </div>
+        <div class="ctrl-row"><span class="ctrl-lbl">Stop loss ($)</span>
+          <input type="number" id="slVal" value="10.00" step="0.01" style="width:70px">
+          <label class="toggle"><input type="checkbox" id="slOn" checked><span class="sl-t"></span></label>
+        </div>
+        <div class="ctrl-row"><span class="ctrl-lbl">Max trades</span>
+          <input type="number" id="maxTrades" value="50" min="1" style="width:60px">
+          <label class="toggle"><input type="checkbox" id="maxOn" checked><span class="sl-t"></span></label>
+        </div>
+        <div class="ctrl-row"><span class="ctrl-lbl">Bot mode</span>
+          <label class="toggle"><input type="checkbox" id="botOn"><span class="sl-t"></span></label>
+          <span class="badge bX" id="botModeBadge">manual</span>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-title">Live trading</div>
+        <div class="ctrl-row">
+          <span class="ctrl-lbl">Live mode</span>
+          <label class="toggle"><input type="checkbox" id="liveToggle"><span class="sl-t"></span></label>
+          <span class="badge bX" id="liveBadge">SIM</span>
+        </div>
+        <div id="liveConfirmWrap" class="live-confirm" style="display:none">
+          <div class="muted" id="liveConfirmInfo" style="margin-bottom:6px">This will place real trades using your Deriv account.</div>
+          <div class="lock-row">
+            <input id="liveConfirmInput" type="text" placeholder="Type TRADE to confirm" autocomplete="off">
+            <button id="liveConfirmBtn" class="btn btnR" type="button">Arm live trading</button>
+          </div>
+          <div id="liveConfirmError" class="lock-error" aria-live="polite"></div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-title">Session P&amp;L</div>
+        <div class="g4" style="margin-bottom:8px">
+          <div class="metric"><div class="mv" id="plTotal" style="color:#71e48a">$0.00</div><div class="ml">Net P&amp;L</div></div>
+          <div class="metric"><div class="mv" id="plWins">0</div><div class="ml">Wins</div></div>
+          <div class="metric"><div class="mv" id="plLosses">0</div><div class="ml">Losses</div></div>
+          <div class="metric"><div class="mv" id="plWR">0%</div><div class="ml">Win rate</div></div>
+        </div>
+        <div class="pl-bar-wrap">
+          <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-bottom:3px">
+            <span>Stop loss</span><span>Take profit</span>
+          </div>
+          <div class="pl-bar-bg"><div class="pl-bar-fill" id="plBar" style="width:50%;background:#8bff5c"></div></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="tab-signals" class="section" role="tabpanel" aria-labelledby="tabBtn-signals">
+      <div class="panel">
+        <div class="panel-title">Live signal feed</div>
+        <div id="sigFeed"><div class="muted">Connect and let digits accumulate to see signals.</div></div>
+      </div>
+      <div class="panel">
+        <div class="panel-title">Signal rules</div>
+        <div class="rule-row">
+          <label class="toggle"><input type="checkbox" id="r1" checked><span class="sl-t"></span></label>
+          <span style="font-size:12px;flex:1">Over rate &gt; 60% in last 50 ticks</span>
+          <span class="badge bX" id="r1s">watching</span>
+        </div>
+        <div class="rule-row">
+          <label class="toggle"><input type="checkbox" id="r2" checked><span class="sl-t"></span></label>
+          <span style="font-size:12px;flex:1">Under rate &gt; 60% in last 50 ticks</span>
+          <span class="badge bX" id="r2s">watching</span>
+        </div>
+        <div class="rule-row">
+          <label class="toggle"><input type="checkbox" id="r3"><span class="sl-t"></span></label>
+          <span style="font-size:12px;flex:1">Over streak &gt;= 4 consecutive</span>
+          <span class="badge bX" id="r3s">off</span>
+        </div>
+        <div class="rule-row">
+          <label class="toggle"><input type="checkbox" id="r4"><span class="sl-t"></span></label>
+          <span style="font-size:12px;flex:1">Under streak &gt;= 4 consecutive</span>
+          <span class="badge bX" id="r4s">off</span>
+        </div>
+        <div class="rule-row">
+          <label class="toggle"><input type="checkbox" id="r5"><span class="sl-t"></span></label>
+          <span style="font-size:12px;flex:1">Loss streak &gt;= 5 - pause bot</span>
+          <span class="badge bX" id="r5s">off</span>
+        </div>
+        <div class="rule-row">
+          <label class="toggle"><input type="checkbox" id="r6"><span class="sl-t"></span></label>
+          <span style="font-size:12px;flex:1">Same digit 3x in last 10 ticks</span>
+          <span class="badge bX" id="r6s">off</span>
+        </div>
+      </div>
+    </div>
+
+    <div id="tab-rich" class="section" role="tabpanel" aria-labelledby="tabBtn-rich">
+      <div class="panel">
+        <div class="panel-title">
+          <span>RICH assistant</span>
+          <span class="badge bP">local</span>
+        </div>
+        <div class="muted" style="margin-bottom:10px">
+          Chat with RICH and optionally include live dashboard context. Use the memory button to help RICH learn your preferences.
+        </div>
+        <div class="rich-toolbar">
+          <div class="rich-field">
+            <label for="richModelInput">Model</label>
+            <input id="richModelInput" class="api-input" placeholder="e.g. qwen3.5:2b">
+          </div>
+          <div class="rich-field">
+            <label for="richApiHostInput">RICH API host</label>
+            <input id="richApiHostInput" class="api-input" placeholder="127.0.0.1:8000">
+          </div>
+          <div class="rich-field">
+            <label for="richApiKeyInput">API key (optional)</label>
+            <input id="richApiKeyInput" class="api-input" type="password" placeholder="Paste key if enabled">
+          </div>
+          <div class="rich-field">
+            <label for="richTtsBackendInput">TTS backend</label>
+            <input id="richTtsBackendInput" class="api-input" placeholder="kokoro">
+          </div>
+          <div class="rich-field">
+            <label for="richVoiceInput">Voice ID</label>
+            <input id="richVoiceInput" class="api-input" placeholder="af_heart">
+          </div>
+          <label class="rich-toggle">
+            <input type="checkbox" id="richSpeakToggle" checked>
+            <span>Speak replies</span>
+          </label>
+          <label class="rich-toggle">
+            <input type="checkbox" id="richContextToggle" checked>
+            <span>Include dashboard context</span>
+          </label>
+          <button class="btn btn-ghost" id="richMemoryBtn" type="button">Save context to memory</button>
+          <span class="muted" id="richStatus">Server: idle</span>
+          <span class="muted" id="richMicStatus">Mic: idle</span>
+        </div>
+        <div class="rich-chat" id="richChatLog" aria-live="polite"></div>
+        <div class="rich-input-row">
+          <textarea id="richInput" rows="2" placeholder="Ask RICH about the current session..."></textarea>
+          <button class="btn btn-ghost" id="richMicBtn" type="button">Mic</button>
+          <button class="btn btn-primary" id="richSendBtn" type="button">Send</button>
+        </div>
+        <div class="rich-note">
+          <label for="richMemoryNote">Memory note (optional)</label>
+          <input id="richMemoryNote" class="api-input" placeholder="e.g. Prefer over/under trades only when streak >= 3">
+        </div>
+      </div>
+    </div>
+
+    <div id="tab-history" class="section" role="tabpanel" aria-labelledby="tabBtn-history">
+      <div class="panel">
+        <div class="panel-title">Digit log</div>
+        <div class="log-box" id="digitLog">Waiting for digits...</div>
+      </div>
+      <div class="panel">
+        <div class="panel-title">
+          <span>System log</span>
+          <button class="btn btn-ghost" id="clearSysLog" type="button">Clear</button>
+        </div>
+        <div class="log-box" id="sysLog">System ready...</div>
+      </div>
+      <div class="panel">
+        <div class="panel-title">Trade history</div>
+        <div class="tbl-wrap">
+          <table>
+            <thead><tr>
+              <th style="width:30px">#</th>
+              <th style="width:80px">Prediction</th>
+              <th style="width:38px">Digit</th>
+              <th style="width:52px">Result</th>
+              <th style="width:50px">Stake</th>
+              <th style="width:54px">P&amp;L</th>
+              <th style="width:62px">Time</th>
+            </tr></thead>
+            <tbody id="tradeBody"><tr><td colspan="7" style="color:var(--muted);font-size:11px">No trades yet</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+      <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap">
+        <button class="btn" type="button" onclick="exportCSV()">Export CSV</button>
+        <button class="btn" type="button" onclick="exportJSON()">Export JSON</button>
+        <button class="btn btnR" type="button" onclick="clearAll()">Clear all</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="deriv_digit_analyzer_v3.js"></script>
+</body>
+</html>
